@@ -1,0 +1,283 @@
+#!/bin/bash
+# id2hostname by Andrew Oakley www.aoakley.com Public Domain 2015
+#
+# Get (and optionally set) a hostname based on a unique hardware
+# identifier. Use -h to read help text.
+#
+# Recommend you place this in /usr/local/sbin/
+# Run it on 1st boot with (for example): sudo crontab -e
+# @reboot sudo su - root -c 'if [ -f /etc/1stboot ]; then rm /etc/1stboot ; raspi-config --expand-rootfs ; id2hostname -s --reboot ; fi'
+# Then sudo touch /etc/1stboot before imaging SD card
+
+# Script name, program version date and current host name
+versiondate='2016-03-16'
+scriptname=`basename $0`
+currname="$(cat /etc/hostname)"
+
+# Path or URL to default config file. URLs must include http:// https:// ftp:// etc
+# If you are using -s --serial then this can be blank, or anything
+conffile='/etc/id2hostname.conf'
+#conffile='http://www.cotswoldjam.org/downloads/setup/id2hostname.conf'
+
+# $idpath is the path to the unique hardware ID. On the Raspberry Pi,
+# the CID for the booted SD card can be found in /sys/block/mmcblk0/device/cid
+# and the MAC address for eth0 is at /sys/class/net/eth0/address
+# If you are using -s --serial then this can be blank, or anything
+defaultidpath='/sys/block/mmcblk0/device/cid'
+defaultserialpath='/sys/block/mmcblk0/device/serial'
+idpath=$defaultidpath
+
+# $workdir is the temporary/working directory. A subdirectory
+# id2hostname/ is created and then deleted under this directory.
+workdir='/tmp'
+
+# Default values for commandline parameters
+doreboot='false'
+oldname='raspberrypi'
+readmode='false'
+testmode='false'
+serialmode='false'
+vebose='false'
+quiet='false'
+sethostname='false'
+
+# Parse parameters
+while [[ "${1:0:1}" == "-" ]]; do
+  case "$1" in
+    ("-h"|"--help")
+      # Ruler - 70 columns ends ........................................... here V
+      echo
+      echo "$scriptname by Andrew Oakley http://www.aoakley.com Public Domain"
+      echo "Usage: [ sudo ] $scriptname  [ OPTIONS ]"
+      echo "Add $0 --reboot"
+      echo "to /etc/rc.local to run at boot time"
+      echo
+      echo "Sets the hostname based on a unique hardware identifier - by default,"
+      echo "the CID of a Raspberry Pi's booted SD card. New hostnames are read"
+      echo "from a config file, by default /etc/$scriptname.conf , which"
+      echo "contains a list of identifiers, followed by a space, followed by the"
+      echo "new hostname, one per line. For example:"
+      echo
+      echo "7342474e436172641012c2073800c400 teacher"
+      echo "1b534d303030303010319106b700e700 pupil01"
+      echo "035344535530324780202411de007800 pupil02"
+      echo
+      echo "You can find your Raspberry Pi's SD card's unique ID by doing:"
+      echo "cat /sys/block/mmcblk0/device/cid"
+      echo "Not got unique CIDs? Buy branded SD cards from good manufacturer!"
+      echo "Not got a Raspberry Pi? Use the --id parameter and MAC address, eg:"
+      echo "cat /sys/class/net/eth0/address"
+      echo
+      echo "The typical use case is where a teacher clones many SD cards for a"
+      echo "classroom of Raspberry Pi computers. By setting the hostname for"
+      echo "each card, the teacher can address each machine individually over"
+      echo "the network, for example: ssh pi@pupil02 , provided zeroconf is"
+      echo "configured and running (which it is on Raspbian OS, as avahi)."
+      echo "On some distros, you may have to use pupil02.lan or pupil02.local ."
+      echo
+      echo "Note that this correctly changes both /etc/hostname *AND* /etc/hosts"
+      echo "as changing /etc/hostname alone without /etc/hosts harms networking."
+      ehoc "However the script does not reconfigure services such as web servers,"
+      ehoc "email servers and so forth, which may need manual reconfiguration."
+      echo
+      echo "You can have your config file hosted as a URL, for example:"
+      echo "$scriptname -c 'http://www.cotswoldjam.org/downloads/setup/id2hostname.conf'"
+      echo
+      echo "Mandatory arguments to long options are mandatory for short options too."
+      echo "--version           Version and author information (for bug reports)"
+      echo "-h, --help          Show this help text then exit"
+      echo "-i, --id filepath   File containing unique hardware ID;"
+      echo "                    default /sys/block/mmcblk0/device/cid"
+      echo "                    also consider /sys/class/net/eth0/address"
+      echo "-c, --conf file|url Configuration file; default /etc/$scriptname.conf"
+      echo "                    You must have curl installed to use a URL"
+      echo "-o, --oldname name  Old hostname to change; default raspberrypi"
+      echo "                    Name won't be changed unless this matches the"
+      echo "                    existing hostname. Set -o '' (empty string) to"
+      echo "                    change hostname regardless (combining -c URL -o ''"
+      echo "                    on every boot will mean slow boot times)."
+      echo "-r, --read          Show the unique hardware ID, then exit without"
+      echo "                    changing hostname (e.g. to copy & paste to .conf file"
+      echo "                    or pipe to a custom script)"
+      echo "-s, --serial        (RPi only) Append last 4 digits of CID serial to"
+      echo "                    hostname. Use with --sethostname or default rpi-XXXX"
+      echo "-t, --test          Display new name but don't actually set it"
+      echo "-v, --verbose       Verbose mode"
+      echo "-q, --quiet         Quiet mode (ignored with -r or -t)"
+      echo "-w, --workdir dir   Working/temporary directory; default /tmp"
+      echo "--reboot            Reboot after setting new hostname"
+      echo "--sethostname name  Just set the hostname, ignoring id & config"
+      echo "                    (also implies -o '' )"
+      echo
+      exit 0
+    ;;
+    ("--version")
+      echo "$scriptname by Andrew Oakley http://www.aoakley.com Public Domain"
+      echo "This version dated $versiondate"
+      exit 0
+    ;;
+    ("-i"|"--id")
+      shift
+      idpath="$1"
+      shift
+    ;;
+    ("-c"|"--conf")
+      shift
+      conffile="$1"
+      shift
+    ;;
+    ("-o"|"--oldname")
+      shift
+      oldname="$1"
+      shift
+    ;;
+    ("-r"|"--read")
+      shift
+      readmode='true'
+      if [[ "$testmode" == "true" ]]; then
+        [[ "$quiet" == "false" ]] && echo "You may not mix --read and --test" >&2
+        exit 1
+      fi
+    ;;
+    ("-s"|"--serial")
+      shift
+      serialmode='true'
+    ;;
+    ("-t"|"--test")
+      shift
+      testmode='true'
+      if [[ "$readmode" == "true" ]]; then
+        [[ "$quiet" == "false" ]] && echo "You may not mix --read and --test" >&2
+        exit 1
+      fi
+    ;;
+    ("-v"|"--verbose")
+      shift
+      verbose='true'
+      quiet='false'
+    ;;
+    ("-q"|"--quiet")
+      shift
+      quiet='true'
+      verbose='false'
+    ;;
+    ("-w"|"--workdir")
+      shift
+      workdir="$1"
+      shift
+    ;;
+    ("--reboot")
+      shift
+      doreboot='true'
+    ;;
+    ("--sethostname")
+      shift
+      sethostname="$1"
+      shift
+      if [[ "$sethostname" == "" ]]; then
+        [[ "$quiet" == "false" ]] && echo "No hostname supplied with --sethostname" >&2
+        exit 2
+      fi
+    ;;
+    (*)
+      [[ "$quiet" == "false" ]] && echo "Invalid parameter: $1" >&2
+      [[ "$verbose" == "true" ]] && echo "Try --help" >&2
+      exit 1
+  esac
+done
+
+if [[ ! -f '/etc/hostname' || ! -f '/etc/hosts' ]]; then
+  [[ "$quiet" == "false" ]] && echo -e "Your distro doesn't appear to use /etc/hosts or\n/etc/hostname. $scriptname is not for you." >&2
+  exit 3
+fi
+
+if [[ "$sethostname" == "false" ]]; then
+  # Find unique ID
+  if [[ ! -r "$idpath" ]]; then
+    [[ "$quiet" == "false" ]] && echo "'$idpath' does not exist or is not readable" >&2
+    [[ "$verbose" == "true" ]] && [[ "$idpath" == "$defaultidpath" ]] && echo "Not on a Raspberry Pi? See --help about --id" >&2
+    exit 4
+  fi
+  myid=`cat $idpath`
+  if [[ "$readmode" == "true" ]]; then
+    echo "$myid"
+    exit 0
+  fi
+  [[ "$verbose" == "true" ]] && echo "My unique ID: '$myid'"
+
+  # Check for oldname
+  if [[ -z "$oldname" || "$oldname" == "$currname" || "$testmode" == "true" ]]; then
+  
+    # Fetch newname
+    if [[ "$serialmode" == "true" ]]; then
+      newname="rpi-`cat $defaultserialpath | cut -c 7-10`"
+    elif [[ -z "$(echo $conffile | grep '://')" ]]; then
+      [[ "$verbose" == "true" ]] && echo "Reading from file: '$conffile'"
+      newname=`grep "$myid" "$conffile" | cut -d\  -f 2`
+    else
+      [[ "$verbose" == "true" ]] && echo "Reading from URL: '$conffile'"
+      newname=`curl -s "$conffile" | grep "$myid" | cut -d\  -f 2`
+    fi
+  
+    if [[ -z "$newname" ]]; then
+      [[ "$verbose" == "true" ]] && echo "Can't find '$myid' in '$conffile' - nothing to do"
+      exit 0
+    fi
+  else
+    [[ "$verbose" == "true" ]] && echo -e "Current hostname '$currname' is not old name '$oldname' - nothing to do\nUse -o '' to force a hostname change regardless."
+    exit 0
+  fi
+else
+  if [[ "$serialmode" == "true" ]]; then
+    newname="$sethostname`cat $defaultserialpath | cut -c 7-10`"
+  else
+    newname=$sethostname
+  fi
+fi
+
+if [[ "$testmode" == "true" ]]; then
+  if [[ "$verbose" == "true" ]]; then
+    if [[ "$newname" == "$currname" ]]; then
+      echo "Host name should be: '$newname' (it already is)"
+    else
+      echo "New host name should be: '$newname'"
+    fi
+  else
+    echo "$newname"
+  fi
+  exit 0
+fi
+if [[ "$newname" == "$currname" ]]; then
+  if [[ "$currname" == "$(hostname)" ]]; then
+    [[ "$verbose" == "true" ]] && echo "Hostname already set to '$newname' - nothing to do"
+  else
+    if [[ "$doreboot" == "false" ]]; then
+      [[ "$verbose" == "true" ]] && echo "Hostname already set to '$newname' - reboot to apply change"
+    else
+      [[ "$quiet" == "false" ]] && echo "Rebooting to apply new hostname '$newname'..."
+      shutdown -r now
+    fi
+  fi
+  exit 0
+fi
+
+if [[ "$(id -u)" != 0 ]]; then
+  [[ "$quiet" == "false" ]] && echo "Not root, so cannot set new hostname '$newname'" >&2
+  [[ "$verbose" == "true" ]] && echo "use sudo $scriptname to solve this problem" >&2
+  exit 5
+fi
+
+[[ "$verbose" == "true" ]] && echo "Setting new hostname: '$newname'"
+mkdir -p "$workdir/id2hostname"
+cd "$workdir/id2hostname"
+echo "$newname" > newname.txt && awk "BEGIN{getline l < \"newname.txt\"}/$currname/{gsub(\"$currname\",l)}1" /etc/hosts | sudo tee newhosts.txt >/dev/null && sudo mv -f newhosts.txt /etc/hosts && sudo mv -f newname.txt /etc/hostname
+rm -r "$workdir/id2hostname"
+
+if [[ "$doreboot" == "true" ]]; then
+  [[ "$quiet" == "false" ]] && echo "Hostname changed to '$newname'. Rebooting..."
+  shutdown -r now
+else
+  [[ "$quiet" == "false" ]] && echo "Hostname changed to '$newname'. Reboot to apply change."
+fi
+
+exit 0

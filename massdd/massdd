@@ -1,0 +1,143 @@
+#!/bin/bash
+# Mass duplication of images to USB flash storage
+# For example, 8 micro SD cards at once, for Raspberry Pi workshops
+
+# dd command
+# I prefer dcfldd which gives progress
+DDCMD="dcfldd"
+
+# Allowed drive letters & drive prefix
+# What do your SD/USB drive letters appear as?
+# Note that the answer is usually /dev/SOMETHING and never /media nor /mnt
+# On my NAS box this is g through p, and they appear under /dev/sdX
+# ************************************************************************
+# * MAKE SURE YOU DO ***NOT*** INCLUDE YOUR ROOT/BOOT/HOME PARTITIONS!!! *
+# ************************************************************************
+# Note that mmcblk devices are not currently supported
+ALLOWEDDRIVES='ghijklmnop'
+DRIVEPREFIX='/dev/sd'
+
+# Notes for future improvements:
+# * Handle mmcblk devices. For example:
+#     /dev/mmcblk0 -> might have two partitions mmcblk0p1 mmcblk0p2
+#     so it isn't just a case of concatenating LETTER to PREFIX; need to add p
+# * Move these constants into an /etc/*.conf file and require setup on 1st run
+# * Sensibly auto-detect ALLOWEDDRIVES by, for example, checking fstab/mtab
+# * Gracefully fall-back from dcfldd to ddrescue to dd
+
+MYNAME=`basename $0`
+if [ "$1" == "" ] || [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
+  #              1         2         3         4         5         6         7
+  #     1234567890123456789012345678901234567890123456789012345678901234567890
+  echo "Usage:"
+  echo "sudo $MYNAME STARTDRIVE [ENDDRIVE] IMAGEFILE.img"
+  echo
+  echo "Mass duplicates an image file to a range of removable drives (typically"
+  echo "micro SD cards inserted into USB SD card readers). The allowed range"
+  echo "is restricted so that the user cannot, for example, accidentally"
+  echo "overwrite the root partition of the computer they are currently using!"
+  echo "For example, /dev/sda is typically not allowed."
+  echo
+  echo "For example:"
+  echo "sudo $MYNAME e h raspbian.img"
+  echo "...duplicates raspbian.img to drives /dev/sde /dev/sdf /dev/sdg /dev/sdh"
+  echo
+  echo "The allowed drives are: $ALLOWEDDRIVES under $DRIVEPREFIX"
+  echo "Change these by editing ALLOWEDDRIVES and DRIVEPREFIX in the script."
+  echo
+  echo "If these are USB drives, then it is STRONGLY recommended to use USB3,"
+  echo "even if the drives are only USB2 - the bandwidth adds up fast."
+  echo
+  echo "Andrew Oakley aoakley.com cotswoldjam.org 2017 Public Domain"
+  exit -1
+fi
+if [[ -z "`which $DDCMD`" ]]; then
+  echo "$DDCMD is not installed; please install it or change DDCMD in script"
+  echo "(typically sudo install $DDCMD )"
+  exit -2
+fi
+if [ "$(id -u)" != 0 ]; then
+  echo "You must be root to run this. Try:"
+  echo "sudo $MYNAME $*"
+  exit -2
+fi 
+if [[ -n "$1" ]]; then
+  if [[ "$ALLOWEDDRIVES" != *"$1"* ]]; then
+    echo "$1 is not an allowed drive."
+    echo "Allowed drives are: $ALLOWEDDRIVES"
+    exit -2
+  fi
+  startdrive=$1
+  shift
+else
+  echo "First paramter must be start drive."
+  exit -2
+fi
+if [[ "$1" != *".img" ]]; then
+  if [[ "$ALLOWEDDRIVES" != *"$1"* ]]; then
+    echo "$1 is not an allowed drive."
+    echo "Allowed drives are: $ALLOWEDDRIVES"
+    echo "(Alternatively; your image filename did not end in .img)"
+    exit -2
+  fi
+  if [[ "$1" < "$startdrive" ]]; then
+    echo "End drive must be equal or after start drive"
+    exit -2
+  fi
+  enddrive=$1
+  shift
+else
+  enddrive=$startdrive
+fi
+if [[ -n "$1" ]]; then
+  imagefile=$1
+else
+  echo "No .img filename supplied"
+  exit -3
+fi
+
+# Iterate through drives
+startindex=$((`expr index "$ALLOWEDDRIVES" "$startdrive"`-1))
+endindex=$((`expr index "$ALLOWEDDRIVES" "$enddrive"`-1))
+
+thisindex=$startindex
+outdrives=""
+while true; do
+  # Identify this drive
+  thisdrive="${ALLOWEDDRIVES:thisindex:1}"
+  # Unmount this drive
+  ls -1 ${DRIVEPREFIX}${thisdrive}[1-9] | xargs -I {} umount {} 2>/dev/null
+  # Add this drive to the duplication string
+  outdrives="$outdrives of=${DRIVEPREFIX}$thisdrive"
+
+  if  [[ $thisindex -ge $endindex ]]; then
+    break
+  fi
+  thisindex=$((thisindex+1))
+done
+
+# Finalise and execute the duplication command
+cmd="$DDCMD if=$imagefile $outdrives"
+echo "$cmd"
+read -p "Run this [y/N]? " -n 1 -r
+if [[ -n $REPLY ]]; then
+  echo
+fi
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+  $cmd
+  sync
+else
+  echo "Aborted."
+fi
+
+# Unmount the drives
+thisindex=$startindex
+while true; do
+  thisdrive="${ALLOWEDDRIVES:thisindex:1}"
+  # Unmount this drive
+  ls -1 ${DRIVEPREFIX}${thisdrive}[1-9] | xargs -I {} umount {} 2>/dev/null
+  if  [[ $thisindex -ge $endindex ]]; then
+    break
+  fi
+  thisindex=$((thisindex+1))
+done

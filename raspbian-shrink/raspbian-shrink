@@ -1,0 +1,202 @@
+#!/bin/bash
+
+######################################################################
+# raspbian-shrink by Andrew Oakley Public Domain 2017 cotswoldjam.org
+#
+# Shrinks a Raspberry Pi Raspbian SD card image
+# e.g. one taken with dd or dcfldd if=/dev/sdX of=imagenaame.img
+# You can then expand the image on the RPi using:
+#   sudo raspi-config --expand-rootfs
+#
+# Note: RASPBIAN images only. Will not work with NOOBS.
+# /usr/local/sbin/ is a good place to keep this script.
+#
+# This is used by Cotswold Raspberry Jam. We prepare a master custom
+# micro SD card with all the tutorials, WiFi etc. set up ready to go.
+# We also remove large rarely-used packages like Wolfram, and we
+# replace large packages like Libreoffice with AbiWord and Gnumeric.
+# We then shrink the image and zip it. It can then be stored,
+# distributed and duplicated, faster with less space and bandwidth.
+# Also we try to keep the image under 4GB for smaller SD cards.
+# Finally we use a fleet of old Linux netbooks to duplicate cards.
+# We use 8GB Samsung class 6 blue cards for our tutorial machines,
+# and we sell 8GB Toshiba M301 class 10 white/red cards for £5, with
+# profit going towards donations/expenses. (Tosh M301 cards rock!)
+# If you like this, also check out our id2hostname utility which
+# allocates unique hostnames to RPis based on SD CID, ideal for
+# network identification using Zeroconf/Avahi/Bonjour.
+#
+# STRONGLY RECOMMEND you use this on an x86/amd64 Linux PC with SSD.
+# It will be slow on anything else. Tested on Ubuntu 16.04.
+#
+# Top tip: Set your image to auto-expand on 1st use by adding a file
+# /boot/1stboot.txt and then set root's crontab to:
+# @reboot if [ -e /boot/1stboot.txt ]; then rm /boot/1stboot.txt ; /usr/bin/raspi-config --expand-rootfs ; /sbin/shutdown -r now ; fi
+#
+# Note there is a known bug in resize2fs which prevents shrinking
+# below a certain size. The constant FREESPACE works around this.
+# If you have large files, you may need to increase FREESPACE to
+# give resize2fs room to move files about while it does its work.
+######################################################################
+
+# Constants
+MOUNTPOINT="/mnt/loop"  # Mount point for image partitions
+FREESPACE=256           # Free space to keep, in MB. Recommend >=256
+
+# Check parameters
+MYNAME=`basename $0`
+OVERWRITE=""
+if [ "$1" == "-f" ]; then
+  OVERWRITE="yes"
+  shift
+fi
+if [ "$1" == "-m" ]; then
+  shift
+  FREESPACE=$1
+  shift
+  if [ $FREESPACE -lt 64 ]; then
+    echo "Must have minimum -m 64 megabytes, recommend >=256"
+    exit -13
+  fi
+fi
+if [ "$1" == "" ] || [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
+  echo "Usage: sudo $MYNAME [ -f ] [ -m FREESPACEMB ] imagename.img [ output.img ]"
+  echo "Shrinks a Raspberry Pi Raspbian SD card image"
+  echo "Public Domain 2016-04 Andrew Oakley cotswoldjam.org"
+  echo "(Note: RASPBIAN images only. Will not work with NOOBS.)"
+  exit -1
+fi
+if [ "$(id -u)" != 0 ]; then
+  echo "You must be root to run this. Try:"
+  echo "sudo $MYNAME $*"
+  exit -2
+fi
+if [ ! -e "$1" ]; then
+  echo "Cannot find '$1'"
+  exit -3
+fi
+if [ "`which dcfldd`" == "" ]; then
+  echo "Please install dcfldd:"
+  echo "sudo apt-get install dcfldd"
+  exit -4
+fi
+if [ "$2" == "" ]; then
+  OUTFILE="output.img"
+else
+  OUTFILE="$2"
+fi
+if [ ! "$OVERWRITE" ] && [ "$1" == "$OUTFILE" ]; then
+  echo "Input and output files are the same."
+  echo "If you really want resize the file in-place, use -f"
+  echo "but be warned, lots of things can go wrong."
+  echo "Make a backup or be prepared to image the card again."
+  exit -5
+fi
+if [ ! "$OVERWRITE" ] && [ -e "$OUTFILE" ]; then
+  echo "Output file '$OUTFILE' already exists."
+  echo "Use -f to overwrite or specify different filename as second parameter."
+  exit -6
+fi
+if [ ! "$OVERWRITE" ] && [ -e "$MOUNTPOINT" ]; then
+  echo "Mount point '$MOUNTPOINT' already exists."
+  echo "Remove this directory/mount or use -f to overwrite."
+  echo "Alternatively change the MOUNTPOINT constant in $MYNAME script."
+  exit -7
+fi
+
+# Clear down the mount point
+umount "$MOUNTPOINT" 2>/dev/null; losetup -d /dev/loop0 2>/dev/null; rmdir "$MOUNTPOINT" 2>/dev/null;
+
+echo "  ***** Checking image *****"
+CHECK1=`fdisk -l "$1" | sed -nr "s/^\S+1\s+([0-9]+).*$/\1/p"`
+START=`fdisk -l "$1" | sed -nr "s/^\S+2\s+([0-9]+).* 83 Linux$/\1/p"`
+SIZE=`fdisk -l "$1" | sed -nr "s/^\S+2\s+[0-9]+\s+[0-9]+\s+([0-9]+).* 83 Linux$/\1/p"`
+CHECK3=`fdisk -l "$1" | sed -nr "s/^\S+3\s+([0-9]+).*$/\1/p"`
+if [ "$START" == "" ] || [ ! "$CHECK3" == "" ]; then
+  echo "File '$1' doesn't look like a Raspbian image file."
+  echo "A Raspbian image file has two partions; one DOS, one Linux."
+  if [ "$START" == "" ]; then
+    echo "This image doesn't have a second Linux partition."
+    if [ "$CHECK1" == "" ]; then
+      echo "Actually, it doesn't have *any* partition information."
+      echo "It might not be an image file at all, or it might be a dump of a"
+      echo "single partition without the partition table."
+    else
+      echo "Note that $MYNAME won't work with NOOBS images."
+    fi
+  else
+    echo "This image has more than two partitions."
+    echo "Note that $MYNAME won't work with NOOBS images."
+  fi
+  exit -8
+fi
+
+if [ "$1" != "$OUTFILE" ]; then
+  echo "  ***** Copying image *****"
+  dcfldd if="$1" of="$OUTFILE"
+else
+  echo "  ***** Resizing without making a copy - good luck! *****"
+fi
+
+echo "  ***** Mounting filesystem *****"
+losetup /dev/loop0 "$OUTFILE" -o $(($START*512))
+mkdir -p "$MOUNTPOINT" ; mount /dev/loop0 "$MOUNTPOINT"
+MINSIZE=`df -m | sed -nr "s/^\/dev\/loop0\s+[0-9]+\s+([0-9]+).*$/\1/p"`
+umount "$MOUNTPOINT"
+NEWSIZE=$((($MINSIZE+$FREESPACE)*2048))
+if [ "$SIZE" -le "$NEWSIZE" ]; then
+  losetup -d /dev/loop0 2>/dev/null; rmdir "$MOUNTPOINT" 2>/dev/null;
+  echo "'$OUTFILE' has $FREESPACE MB or less free."
+  echo "Image can't be shrunk any further."
+  echo "Maybe this is an image you've already shrunk?"
+  exit -9
+fi
+
+echo "  ***** Checking filesystem *****"
+e2fsck -fy /dev/loop0
+if [ $? -ne 0 ]; then
+  losetup -d /dev/loop0 2>/dev/null; rmdir "$MOUNTPOINT" 2>/dev/null;
+  echo "fsck failed. Check if the image is corrupt, e.g. partial download."
+  exit -10
+fi
+
+echo "  ***** Resizing filesystem *****"
+resize2fs -f /dev/loop0 $(($MINSIZE+$FREESPACE))M
+if [ $? -ne 0 ]; then
+  losetup -d /dev/loop0 2>/dev/null; rmdir "$MOUNTPOINT" 2>/dev/null;
+  echo "resize2fs failed. Good luck with that."
+  exit -11
+fi
+losetup -d /dev/loop0
+echo -e "p\nd\n2\nn\np\n2\n$START\n+$NEWSIZE\np\nw\n" | fdisk "$OUTFILE"
+END=`fdisk -l "$OUTFILE" | sed -nr "s/^\S+\.img2\s+[0-9]+\s+([0-9]+).*$/\1/p"`
+
+echo "  ***** Truncating image *****"
+truncate -s $((($END+1)*512)) "$OUTFILE"
+
+losetup /dev/loop0 "$OUTFILE" -o $(($START*512))
+mount /dev/loop0 "$MOUNTPOINT"
+if [ $? -ne 0 ]; then
+  umount "$MOUNTPOINT" ; rmdir "$MOUNTPOINT" ; losetup -d /dev/loop0
+  echo "Something went badly wrong. Can't mount the truncated image."
+  echo "Look for error messages above."
+  exit -12
+fi
+
+echo "  ***** Zero-filling free space *****"
+dcfldd if=/dev/zero of="$MOUNTPOINT"/zero.txt
+rm "$MOUNTPOINT"/zero.txt
+umount "$MOUNTPOINT" 2>/dev/null; losetup -d /dev/loop0 2>/dev/null; rmdir "$MOUNTPOINT" 2>/dev/null;
+
+# As this is run by sudo, the output gets owned by root.
+# This isn't usually what is desired. So let's try to fix that by guessing
+# what the real user name (and group) is, and chowning the file to that.
+CALLER=`who am i | awk '{print $1}'`
+if [ "$CALLER" != "root" ]; then
+  echo "  ***** Changing ownership to '$CALLER' *****"
+  chown $CALLER.`groups $CALLER | awk '{print $1}'` "$OUTFILE" 2>/dev/null
+fi
+
+echo "  ***** Finished *****"
+echo "If no errors reported, resized image is now: $OUTFILE"
+ls -shp1 "$1" "$OUTFILE"
