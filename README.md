@@ -11,6 +11,10 @@ http://www.cotswoldjam.org
 1. This is my first attempt at a Github repository. I may mess things up.
 2. I have only tested these scripts on my own machines. I may mess YOUR COMPUTER up. The SD card shrinking and duplication utilities, in particular, MIGHT COMPLETELY TRASH YOUR MACHINE by overwriting, for example, your root or boot partitions. I **STRONGLY** recommend testing these on a virtual machine until this repo is in a mature state (current state: not mature). You can use USB port pass-through to test this on VMs; for example the Extension Pack on Virtualbox will enable USB2 & USB3 ports at full speed (by default Virtualbox supports only USB1 speeds). Alternatively, test on a real machine for which you have tried and tested backups.
 
+# Command line --help
+
+All of my utilities should display a brief, but hopefully comprehensive, usage guide when you pass the parameter --help.
+
 ## raspbian-shrink
 
 This utility is designed to be run on a Debian/Ubuntu PC (not a Raspberry Pi) as part of preparing an SD card image for duplication.
