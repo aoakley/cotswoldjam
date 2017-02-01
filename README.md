@@ -31,7 +31,11 @@ This utility is an extension of the work explained in my article [Shrinking Rasp
 
 This utility is designed to be run on a Raspberry Pi under Raspbian, but it could run under most Linux environments.
 
-A utility for setting a (hopefully unique) hostname based on some (hopefully unique) serial number, which is typically the micro SD card ID (CID) but might be MAC address or some other hardware serial identifier. For example, you want to teach a tutorial on networking and make use of Zeroconf/Avahi .local/.lan domain names, so you want each Raspberry Pi in your class to have a different hostname. You create an image that runs id2hostname on first boot and hey presto, rpi-a13d.local can now ping rpi-5e7f.local . You can also have a specific list of specific names (e.g. pupil names, team names) and host that list in /etc/ or on a website.
+A utility for setting a (hopefully unique) hostname based on some (hopefully unique) serial number, which is typically the micro SD card ID (CID) but might be MAC address or some other hardware serial identifier. You can also have a specific list of specific host names (e.g. pupil names, team names) and hold that list in /etc/ or on a website.
+
+For example, you want to teach a tutorial on networking and make use of Zeroconf/Avahi .local/.lan domain names, so you want each Raspberry Pi in your class to have a different hostname. You create an image that runs id2hostname on first boot and hey presto, rpi-a13d.local can now ping rpi-5e7f.local .
+
+Another example, you have a pupil come to you who wants to take his program home with him. Because you can individually address his Raspberry Pi, you can just scp to his particular machine with Zeroconf, grab the file and email it to his parents without having to leave the your desk.
 
 Find out [more about SD card identifiers](http://www.cameramemoryspeed.com/sd-memory-card-faq/reading-sd-card-cid-serial-psn-internal-numbers/).
 
