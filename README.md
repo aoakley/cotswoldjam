@@ -23,6 +23,8 @@ This utility is an extension of the work explained in my article [Shrinking Rasp
 
 A utility for setting a (hopefully unique) hostname based on some (hopefully unique) serial number, which is typically the micro SD card ID (CID) but might be MAC address or some other hardware serial identifier. For example, you want to teach a tutorial on networking and make use of Zeroconf/Avahi .local/.lan domain names, so you want each Raspberry Pi in your class to have a different hostname. You create an image that runs id2hostname on first boot and hey presto, rpi-a13d.local can now ping rpi-5e7f.local . You can also have a specific list of specific names (e.g. pupil names, team names) and host that list in /etc/ or on a website.
 
+Find out [more about SD card identifiers](http://www.cameramemoryspeed.com/sd-memory-card-faq/reading-sd-card-cid-serial-psn-internal-numbers/).
+
 ## massdd
 
 For mass duplication of removable drives, typically micro SD cards. Firstly this provides some safety by not allowing you to accidentally overwrite your root / boot / home partition! (Oh, come on, we've all done that.) Next it allows you to specify a range of drives, so that rather than writing out if=/dev/sde if=/dev/sdf if=/dev/sdg if=/dev/sdg etc. etc. etc... you can instead just specify a range e..h .
