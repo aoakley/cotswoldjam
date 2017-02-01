@@ -1,5 +1,7 @@
 # cotswoldjam
-Command-line utilities for the Raspberry Pi, of particular interest to Raspberry Jam organisers &amp; educators
+Command-line utilities for the Raspberry Pi, of particular interest to Raspberry Jam organisers &amp; educators.
+
+Public domain. You can copy, change or redistribute these files as you wish without having to ask nor credit us/me. If you want to say thanks, please [make a donation to Cotswold Raspberry Jam](http://paypal.me/cotswoldjam) - thank-you.
 
 ![Cotswold Jam logo](http://cotswoldjam.org/assets/images/cotswoldjam-logo-128x80.png)
 http://www.cotswoldjam.org
