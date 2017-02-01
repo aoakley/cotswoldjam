@@ -15,6 +15,8 @@ http://www.cotswoldjam.org
 
 All of my utilities should display a brief, but hopefully comprehensive, usage guide when you pass the parameter --help.
 
+Furthermore there are loads of comments in the code which should enable you to debug or customise the scripts to your heart's content. At the moment these are all Bash scripts, but I might add some Perl or somesuch at a later date.
+
 ## raspbian-shrink
 
 This utility is designed to be run on a Debian/Ubuntu PC (not a Raspberry Pi) as part of preparing an SD card image for duplication.
