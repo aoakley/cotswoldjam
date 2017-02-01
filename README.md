@@ -13,6 +13,8 @@ http://www.cotswoldjam.org
 
 ## raspbian-shrink
 
+This utility is designed to be run on a Debian/Ubuntu PC (not a Raspberry Pi) as part of preparing an SD card image for duplication.
+
 This takes a Raspbian image file, and shrinks it to a minimum size. Suppose you have an 8GB SD card image with only 4.4GB used. This utility will shrink that .img file down to just over 4.4GB. Not only that, but the tiny (configurable) amount of free space is zero-filled, thus making it compress better (for example, with zip or tar xvzf).
 
 raspbian-shrink will work with any image that contains two partitions, of which the second is a Linux ext2/3/4 partition. So for example it should work with Ubuntu Mate images. It **will not work with NOOBS** because that creates, oooh, at least 5 partitions, and potentially a lot more if you dual-boot other OSes.
@@ -21,11 +23,15 @@ This utility is an extension of the work explained in my article [Shrinking Rasp
 
 ## id2hostname
 
+This utility is designed to be run on a Raspberry Pi under Raspbian, but it could run under most Linux environments.
+
 A utility for setting a (hopefully unique) hostname based on some (hopefully unique) serial number, which is typically the micro SD card ID (CID) but might be MAC address or some other hardware serial identifier. For example, you want to teach a tutorial on networking and make use of Zeroconf/Avahi .local/.lan domain names, so you want each Raspberry Pi in your class to have a different hostname. You create an image that runs id2hostname on first boot and hey presto, rpi-a13d.local can now ping rpi-5e7f.local . You can also have a specific list of specific names (e.g. pupil names, team names) and host that list in /etc/ or on a website.
 
 Find out [more about SD card identifiers](http://www.cameramemoryspeed.com/sd-memory-card-faq/reading-sd-card-cid-serial-psn-internal-numbers/).
 
 ## massdd
+
+This program is designed to be run on a Debian/Ubuntu PC (not a Raspberry Pi) that is being used to duplicate Raspberry Pi memory cards in bulk.
 
 For mass duplication of removable drives, typically micro SD cards. Firstly this provides some safety by not allowing you to accidentally overwrite your root / boot / home partition! (Oh, come on, we've all done that.) Next it allows you to specify a range of drives, so that rather than writing out if=/dev/sde if=/dev/sdf if=/dev/sdg if=/dev/sdg etc. etc. etc... you can instead just specify a range e..h .
 
