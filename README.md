@@ -11,7 +11,7 @@ http://www.cotswoldjam.org
 
 ## raspbian-shrink
 
-This takes a Raspbian image file, and shrinks it to a minimum size. Suppose you have an 8GB SD card image with only 4.4GB used. This utility will shrink that .img file down to just over 4.4GB. Not only that, but the tiny (configurable) amount of free space is zero-filled, this making it compress better (for example, with zip or tar xvzf).
+This takes a Raspbian image file, and shrinks it to a minimum size. Suppose you have an 8GB SD card image with only 4.4GB used. This utility will shrink that .img file down to just over 4.4GB. Not only that, but the tiny (configurable) amount of free space is zero-filled, thus making it compress better (for example, with zip or tar xvzf).
 
 raspbian-shrink will work with any image that contains two partitions, of which the second is a Linux ext2/3/4 partition. So for example it should work with Ubuntu Mate images. It **will not work with NOOBS** because that creates, oooh, at least 5 partitions, and potentially a lot more if you dual-boot other OSes.
 
@@ -28,6 +28,10 @@ For mass duplication of removable drives, typically micro SD cards. Firstly this
 I could write a huge essay on the best ways to duplicate SD cards en masse, but the key thing is to use a USB3 host controller. Bear in mind that most USB2 ports on a PC will run from one single USB2 host controller chip, thereby sharing USB2's limited bandwidth. Whereas if you buy yourself a 10-port USB3 hub and connect it to a single USB3 port, then plug in ten USB2 SD card reader/writers, you will not even begin to max out the huge bandwidth of the USB3 host controller.
 
 # A note about mass duplicating SD cards
+
+First off, ask yourself "do I even need to do this?" **If your classroom has, or can have, a wired network, then [Andrew Mulholland's PiNet](http://pinet.org.uk) is by far the best way to have uniform Raspberry Pi environments with centralised user accounts and centralised storage.**
+
+At Cotswold Jam, we can't use a wired network, because we run in 5 different classrooms across two floors, and our very lovely venue very reasonably forbids us from plugging into their existing wired network. So we prep a standard customised distro of Raspbian with all our workshop/tutorials set up, ready to go. We also sell these ready-made cards to attendees at a tiny markup towards donations. You'd be amazed how few Raspberry Pi users are able to update their cards, let alone download tutorial files.
 
 When you're duplicating 50 SD cards at a time, like we do at Cotswold Jam, USB3 and shrunken image files make a huge difference. Previously we were spending 3-4 hours copying cards one at a time on three USB2 laptops. Now we spend just over an hour duplicating ten at a time on one USB3 PC.
 
