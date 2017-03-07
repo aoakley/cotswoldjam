@@ -1,0 +1,114 @@
+#!/bin/bash
+
+######################################################################
+# raspbian-mount by Andrew Oakley Public Domain 2017 cotswoldjam.org
+#
+# Mounts both, or 2nd, partition(s) of a Raspbian image
+######################################################################
+
+# Constants
+MOUNTPOINT1=""  # Mount point for image partitions
+MOUNTPOINT2="/mnt/loop2"  # Mount point for image partitions
+MYNAME=`basename $0`
+
+# Check parameters
+if [ "$1" == "" ] || [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
+  echo "Usage: sudo $MYNAME [ -f ] [ [MOUNTPOINT1] MOUNTPOINT2 ] imagename.img"
+  echo "       sudo $MYNAME -u | --umount | --unmount"
+  echo "Mounts 2nd (root) partition of a Raspbian SD card image"
+  echo "Also mounts 1st (boot) partition if you provide MOUNTPOINT1"
+  echo "Public Domain 2016-04 Andrew Oakley cotswoldjam.org"
+  echo "(Note: RASPBIAN images only. Will not work with NOOBS.)"
+  exit -1
+fi
+if [ "$(id -u)" != 0 ]; then
+  echo "You must be root to run this. Try:"
+  echo "sudo $MYNAME $*"
+  exit -2
+fi
+if [ "$1" == "-f" ]; then
+  shift
+  OVERWRITE="yes"
+  shift
+fi
+
+if [ "$1" == "-u" ] || [ "$1" == "--umount" ] || [ "$1" == "--unmount" ]; then
+  umount /dev/loop1 /dev/loop2 2>/dev/null
+  losetup -d /dev/loop1 /dev/loop2 2>/dev/null
+  echo "/dev/loop1 & /dev/loop2 unmounted"
+  exit
+fi
+
+if [ $# -ge 3 ]; then
+  MOUNTPOINT1=$1
+  shift
+  if [ -n "$OVERWRITE" ] && [ -e "$MOUNTPOINT1" ]; then
+    echo "Mount point '$MOUNTPOINT1' already exists."
+    echo "Remove this directory/mount or use -f to overwrite."
+    exit -7
+  fi
+  if [ -n "$OVERWRITE" ] && [ mount | grep /dev/loop1 >/dev/null ]; then
+    echo "Loopback device /dev/loop1 already exists."
+    echo "Remove this device or use -f to overwrite."
+    exit -7
+  fi
+  # Clear down the mount point
+  umount "$MOUNTPOINT1" 2>/dev/null; losetup -d /dev/loop1 2>/dev/null; rmdir "$MOUNTPOINT1" 2>/dev/null;
+fi
+
+if [ $# -ge 2 ]; then
+  MOUNTPOINT2=$2
+  shift
+fi
+if [ -n "$OVERWRITE" ] && [ -e "$MOUNTPOINT2" ]; then
+  echo "Mount point '$MOUNTPOINT2' already exists."
+  echo "Remove this directory/mount or use -f to overwrite."
+  exit -7
+fi
+if [ -n "$OVERWRITE" ] && [ mount | grep /dev/loop2 >/dev/null ]; then
+  echo "Loopback device /dev/loop2 already exists."
+  echo "Remove this device or use -f to overwrite."
+  exit -7
+fi
+# Clear down the mount point
+umount "$MOUNTPOINT2" 2>/dev/null; losetup -d /dev/loop2 2>/dev/null; rmdir "$MOUNTPOINT2" 2>/dev/null;
+
+if [ ! -e "$1" ]; then
+  echo "Image '$1' not found."
+  echo "Use --help for usage information."
+fi
+
+START1=`fdisk -l "$1" | sed -nr "s/^\S+1\s+([0-9]+).*$/\1/p"`
+SIZE1=`fdisk -l "$1" | sed -nr "s/^\S+2\s+[0-9]+\s+[0-9]+\s+([0-9]+).*$/\1/p"`
+START2=`fdisk -l "$1" | sed -nr "s/^\S+2\s+([0-9]+).*\s+83\s+Linux$/\1/p"`
+SIZE2=`fdisk -l "$1" | sed -nr "s/^\S+2\s+[0-9]+\s+[0-9]+\s+([0-9]+).*\s+83 Linux$/\1/p"`
+CHECK3=`fdisk -l "$1" | sed -nr "s/^\S+3\s+([0-9]+).*$/\1/p"`
+
+if [ "$START2" == "" ] || [ ! "$CHECK3" == "" ]; then
+  echo "File '$1' doesn't look like a Raspbian image file."
+  echo "A Raspbian image file has two partions; one DOS, one Linux."
+  if [ "$START2" == "" ]; then
+    echo "This image doesn't have a second Linux partition."
+    if [ "$START1" == "" ]; then
+      echo "Actually, it doesn't have *any* partition information."
+      echo "It might not be an image file at all, or it might be a dump of a"
+      echo "single partition without the partition table."
+    else
+      echo "Note that $MYNAME won't work with NOOBS images."
+    fi
+  else
+    echo "This image has more than two partitions."
+    echo "Note that $MYNAME won't work with NOOBS images."
+  fi
+  exit -8
+fi
+
+if [ -n "$MOUNTPOINT1" ]; then
+  losetup /dev/loop1 "$1" -o $(($START1*512))
+  mkdir -p "$MOUNTPOINT1" ; mount /dev/loop1 "$MOUNTPOINT1"
+  echo "Mounted 1st (boot) partition on: '$MOUNTPOINT1'"
+fi
+losetup /dev/loop2 "$1" -o $(($START2*512))
+mkdir -p "$MOUNTPOINT2" ; mount /dev/loop2 "$MOUNTPOINT2"
+echo "Mounted 2nd (root) partition on: '$MOUNTPOINT2'"
+echo "Use $MYNAME -u to unmount"
