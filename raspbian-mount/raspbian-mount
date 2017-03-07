@@ -29,7 +29,6 @@ fi
 if [ "$1" == "-f" ]; then
   shift
   OVERWRITE="yes"
-  shift
 fi
 
 if [ "$1" == "-u" ] || [ "$1" == "--umount" ] || [ "$1" == "--unmount" ]; then
@@ -42,12 +41,12 @@ fi
 if [ $# -ge 3 ]; then
   MOUNTPOINT1=$1
   shift
-  if [ -n "$OVERWRITE" ] && [ -e "$MOUNTPOINT1" ]; then
+  if [ -z "$OVERWRITE" ] && [ -e "$MOUNTPOINT1" ]; then
     echo "Mount point '$MOUNTPOINT1' already exists."
     echo "Remove this directory/mount or use -f to overwrite."
     exit -7
   fi
-  if [ -n "$OVERWRITE" ] && [ mount | grep /dev/loop1 >/dev/null ]; then
+  if [ -z "$OVERWRITE" ] && [ -n "`mount | grep '/dev/loop1' >/dev/null`" ]; then
     echo "Loopback device /dev/loop1 already exists."
     echo "Remove this device or use -f to overwrite."
     exit -7
@@ -57,15 +56,15 @@ if [ $# -ge 3 ]; then
 fi
 
 if [ $# -ge 2 ]; then
-  MOUNTPOINT2=$2
+  MOUNTPOINT2=$1
   shift
 fi
-if [ -n "$OVERWRITE" ] && [ -e "$MOUNTPOINT2" ]; then
+if [ -z "$OVERWRITE" ] && [ -e "$MOUNTPOINT2" ]; then
   echo "Mount point '$MOUNTPOINT2' already exists."
   echo "Remove this directory/mount or use -f to overwrite."
   exit -7
 fi
-if [ -n "$OVERWRITE" ] && [ mount | grep /dev/loop2 >/dev/null ]; then
+if [ -z "$OVERWRITE" ] && [ -n "`mount | grep '/dev/loop2' >/dev/null`" ]; then
   echo "Loopback device /dev/loop2 already exists."
   echo "Remove this device or use -f to overwrite."
   exit -7
