@@ -27,6 +27,14 @@ raspbian-shrink will work with any image that contains two partitions, of which 
 
 This utility is an extension of the work explained in my article [Shrinking Raspberry Pi SD Card Images](http://aoakley.com/articles/2015-10-09-resizing-sd-images.php).
 
+Note that raspbian-shrink will be pretty slow if you're using a mechanical hard drive; I recommend using an SSD.
+
+## raspbian-mount
+
+A quick utility for mounting Raspbian images on a Debian/Ubuntu PC or Raspberry Pi. Suppose you have a Raspbian image file whatever.img and you need to quickly grab a file from within it. This utility mounts the second partition (the /root/ partiton) on /mnt/loop2 for you. Note that whatever changes you make to the files *will* be retained inside the .img file. Use --help to see full usage (inc. how to mount 1st /boot/ partition and how to specify mount locations) and use --unmount to unmount the partitons.
+
+Note that this uses /dev/loop1 and /dev/loop2 loopback devices. If they're already in use, you'll need to pass -f to force them to be unmounted and unlooped. It would be nice if that were made less belligerent.
+
 ## id2hostname
 
 This utility is designed to be run on a Raspberry Pi under Raspbian, but it could run under most Linux environments.
