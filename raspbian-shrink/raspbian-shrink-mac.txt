@@ -1,0 +1,56 @@
+From: James Osborne
+Date: 2 June 2017 at 12:58
+Subject: [aoakley/cotswoldjam] Shrinking images on a MacBook (#4)
+
+Hi,
+
+Thanks so much for these scripts, particularly the raspbian-shrink! I wanted to use this on my MacBook, but of course it isn't directly useable because things like e2fs aren't supported. However, it was possible to get it working in Docker for Mac.
+
+This is how I did it, which I leave here in case it is useful for anyone else:
+
+    Clone your repo:
+    mkdir raspbian-shrink && cd !$ && git clone https://github.com/aoakley/cotswoldjam.git
+
+    Create a file called "Dockerfile" in directory raspbian-shrink with the following content:
+
+FROM ubuntu:latest
+
+RUN apt-get -y update && apt-get -y install dcfldd
+
+# Copy the raspbian-shrink script file into somewhere on the $PATH
+COPY ./cotswoldjam/raspbian-shrink /usr/local/bin
+
+# Change the script permissions
+RUN chmod a+x /usr/local/bin/raspbian-shrink
+
+WORKDIR /work-dir
+
+VOLUME [ "/work-dir" ]
+
+ENTRYPOINT [ "/usr/local/bin/raspbian-shrink", "-m", "256" ]
+CMD ["original.img", "shrunk.img"]
+
+    Build the docker image, in the same directory, here represents a repository name and the image will be called raspbian-shrink:
+
+docker build -t <name>/raspbian-shrink .
+
+    To run the container and shrink our image (large.img) we need some extra permissions to execute the mounts and we must map the loop0 device (which actually comes from the underlying linux VM running in xhyve that is part of Docker for Mac AFAIK). This command assumes that large.img is in the current working directory, but you can change this behaviour by modifying this command to insert the path to the image instead of $(pwd):
+
+docker run --rm -it -v $(pwd):/work-dir --device=/dev/loop0:/dev/loop0:rw --cap-add=SYS_ADMIN --name shrink <name>/raspbian-shrink large.img shrunk.img
+
+    Since this command will be used a lot, I created a function in my .bashrc file like this:
+
+DOCKER_REPO_PREFIX=<name>
+
+shrink()
+{
+   docker run --rm \
+       -it \
+       -v `pwd`:/work-dir \
+       --device=/dev/loop0:/dev/loop0:rw \
+       --cap-add=SYS_ADMIN \
+       --name shrink \
+       ${DOCKER_REPO_PREFIX}/rapbian-shrink "$@"
+}
+
+So, after re-loading .bashrc, I can now shrink an image thus: shrink large.img small.img directly from my terminal in Mac OS X
