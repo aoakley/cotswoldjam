@@ -42,6 +42,7 @@
 # Constants
 MOUNTPOINT="/mnt/loop"  # Mount point for image partitions
 FREESPACE=256           # Free space to keep, in MB. Recommend >=256
+LABEL="The Jam"         # Label of main partition. Leave empty for no label
 
 # Check parameters
 MYNAME=`basename $0`
@@ -181,6 +182,13 @@ if [ $? -ne 0 ]; then
   echo "Something went badly wrong. Can't mount the truncated image."
   echo "Look for error messages above."
   exit -12
+fi
+
+echo "  ***** Renaming filesystem *****"
+e2label /dev/loop0 "$LABEL"
+if [ $? -ne 0 ]; then
+  echo "e2label failed. Unable to rename filesystem."
+  exit -13
 fi
 
 echo "  ***** Zero-filling free space *****"
