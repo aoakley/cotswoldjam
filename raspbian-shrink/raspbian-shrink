@@ -110,8 +110,8 @@ umount "$MOUNTPOINT" 2>/dev/null; losetup -d /dev/loop0 2>/dev/null; rmdir "$MOU
 
 echo "  ***** Checking image *****"
 CHECK1=`fdisk -l "$1" | sed -nr "s/^\S+1\s+([0-9]+).*$/\1/p"`
-START=`fdisk -l "$1" | sed -nr "s/^\S+2\s+([0-9]+).*\s+83\s+Linux$/\1/p"`
-SIZE=`fdisk -l "$1" | sed -nr "s/^\S+2\s+[0-9]+\s+[0-9]+\s+([0-9]+).*\s+83\s+Linux$/\1/p"`
+START=`fdisk -l "$1" | sed -nr "s/^\S+2\s+([0-9]+).* 83 Linux$/\1/p"`
+SIZE=`fdisk -l "$1" | sed -nr "s/^\S+2\s+[0-9]+\s+[0-9]+\s+([0-9]+).* 83 Linux$/\1/p"`
 CHECK3=`fdisk -l "$1" | sed -nr "s/^\S+3\s+([0-9]+).*$/\1/p"`
 if [ "$START" == "" ] || [ ! "$CHECK3" == "" ]; then
   echo "File '$1' doesn't look like a Raspbian image file."
@@ -139,18 +139,33 @@ else
   echo "  ***** Resizing without making a copy - good luck! *****"
 fi
 
-echo "  ***** Mounting filesystem *****"
+echo "  ***** Mounting filesystem to examine free space *****"
 losetup /dev/loop0 "$OUTFILE" -o $(($START*512))
 mkdir -p "$MOUNTPOINT" ; mount /dev/loop0 "$MOUNTPOINT"
 MINSIZE=`df -m | sed -nr "s/^\/dev\/loop0\s+[0-9]+\s+([0-9]+).*$/\1/p"`
 umount "$MOUNTPOINT"
 NEWSIZE=$((($MINSIZE+$FREESPACE)*2048))
 if [ "$SIZE" -le "$NEWSIZE" ]; then
-  losetup -d /dev/loop0 2>/dev/null; rmdir "$MOUNTPOINT" 2>/dev/null;
-  echo "'$OUTFILE' has $FREESPACE MB or less free."
-  echo "Image can't be shrunk any further."
-  echo "Maybe this is an image you've already shrunk?"
-  exit -9
+  if [ ! "$OVERWRITE" ]; then
+    losetup -d /dev/loop0 2>/dev/null; rmdir "$MOUNTPOINT" 2>/dev/null;
+    echo "'$OUTFILE' has $FREESPACE MB or less free."
+    echo "Image can't be shrunk any further."
+    echo "Maybe this is an image you've already shrunk?"
+    echo "Use -f to force ignoring this (if you want to expand it)"
+    exit -9
+  else
+    if [ "$SIZE" -eq "$NEWSIZE" ]; then
+      losetup -d /dev/loop0 2>/dev/null; rmdir "$MOUNTPOINT" 2>/dev/null;
+      echo "'$OUTFILE' already has exactly $FREESPACE MB free."
+      echo "Nothing to do."
+      exit -9
+    fi
+    echo "  ***** Unmounting then padding image to add more free space *****"
+    losetup -d /dev/loop0 2>/dev/null;
+    dcfldd statusinterval=16 if=/dev/zero bs=1M count=$((($NEWSIZE-$SIZE+2048)/2048)) >>"$OUTFILE"
+    echo "  ***** Remounting *****"
+    losetup /dev/loop0 "$OUTFILE" -o $(($START*512))
+  fi
 fi
 
 echo "  ***** Checking filesystem *****"
