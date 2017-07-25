@@ -9,7 +9,7 @@ http://www.cotswoldjam.org
 ## Disclaimer
 
 1. This is my first attempt at a Github repository. I may mess things up.
-2. I have only tested these scripts on my own machines. I may mess YOUR COMPUTER up. The SD card shrinking and duplication utilities, in particular, MIGHT COMPLETELY TRASH YOUR MACHINE by overwriting, for example, your root or boot partitions. I **STRONGLY** recommend testing these on a virtual machine until this repo is in a mature state (current state: not mature). You can use USB port pass-through to test this on VMs; for example the Extension Pack on Virtualbox will enable USB2 & USB3 ports at full speed (by default Virtualbox supports only USB1 speeds). Alternatively, test on a real machine for which you have tried and tested backups.
+2. I have only tested these scripts on my own machines. I may mess YOUR COMPUTER up. The SD card shrinking and duplication utilities, in particular, MIGHT COMPLETELY TRASH YOUR MACHINE by overwriting, for example, your root or boot partitions. I **STRONGLY** recommend testing these on a virtual machine until this repo is in a fully mature state (current state: medium mature; these utilities have been used by half a dozen or more people for several months, and nobody's lost any data yet). You can use USB port pass-through to test this on VMs; for example the Extension Pack on Virtualbox will enable USB2 & USB3 ports at full speed (by default Virtualbox supports only USB1 speeds). Alternatively, test on a real machine for which you have tried and tested backups.
 
 # Command line --help
 
@@ -19,7 +19,7 @@ Furthermore there are loads of comments in the code which should enable you to d
 
 ## raspbian-shrink
 
-This utility is designed to be run on a Debian/Ubuntu PC (not a Raspberry Pi) as part of preparing an SD card image for duplication.
+This utility is designed to be run on a Debian/Ubuntu PC (not a Raspberry Pi) as part of preparing an SD card image for duplication or archiving.
 
 This takes a Raspbian image file, and shrinks it to a minimum size. Suppose you have an 8GB SD card image with only 4.4GB used. This utility will shrink that .img file down to just over 4.4GB. Not only that, but the tiny (configurable) amount of free space is zero-filled, thus making it compress better (for example, with zip or tar xvzf).
 
@@ -28,6 +28,8 @@ raspbian-shrink will work with any image that contains two partitions, of which 
 This utility is an extension of the work explained in my article [Shrinking Raspberry Pi SD Card Images](http://aoakley.com/articles/2015-10-09-resizing-sd-images.php).
 
 Note that raspbian-shrink will be pretty slow if you're using a mechanical hard drive; I recommend using an SSD.
+
+As of 23 July 2017, raspbian-shrink now also supports increasing the available free space (i.e. the opposite of shrinking) using the `-f -m 1024` parameters (force, 1024 megabytes free space). I find this useful for when I need, say, 1GB of free space (for example to perform some updates or work with a tutorial project) but I don't want to expand the filesystem to the full, say, 16GB of the card I'm using, to save time re-imaging the card. Using `dcfldd bs=1M statusinterval=16 count=3072 if=/dev/sde of=output.img` I can image just the first 3GB of the card only. Note that **free space calculation is VERY approximate**; not much better than 10% accurate. This is because my script relies on `df` which isn't very accurate either.
 
 ## raspbian-mount
 
