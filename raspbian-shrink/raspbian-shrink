@@ -109,8 +109,8 @@ umount "$MOUNTPOINT" 2>/dev/null; losetup -d /dev/loop0 2>/dev/null; rmdir "$MOU
 
 echo "  ***** Checking image *****"
 CHECK1=`fdisk -l "$1" | sed -nr "s/^\S+1\s+([0-9]+).*$/\1/p"`
-START=`fdisk -l "$1" | sed -nr "s/^\S+2\s+([0-9]+).* 83 Linux$/\1/p"`
-SIZE=`fdisk -l "$1" | sed -nr "s/^\S+2\s+[0-9]+\s+[0-9]+\s+([0-9]+).* 83 Linux$/\1/p"`
+START=`fdisk -l "$1" | sed -nr "s/^\S+2\s+([0-9]+).* 83\s+Linux$/\1/p"`
+SIZE=`fdisk -l "$1" | sed -nr "s/^\S+2\s+[0-9]+\s+[0-9]+\s+([0-9]+).* 83\s+Linux$/\1/p"`
 CHECK3=`fdisk -l "$1" | sed -nr "s/^\S+3\s+([0-9]+).*$/\1/p"`
 if [ "$START" == "" ] || [ ! "$CHECK3" == "" ]; then
   echo "File '$1' doesn't look like a Raspbian image file."
