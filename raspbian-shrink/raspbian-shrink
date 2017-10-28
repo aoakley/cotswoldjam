@@ -42,7 +42,7 @@
 # Constants
 MOUNTPOINT="/mnt/loop"  # Mount point for image partitions
 FREESPACE=256           # Free space to keep, in MB. Recommend >=256
-LABEL="The Jam"         # Label of main partition. Leave empty for no label
+LABEL=""                # Label of main partition. Leave empty for no label
 
 # Check parameters
 MYNAME=`basename $0`
