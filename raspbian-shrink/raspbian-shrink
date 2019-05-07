@@ -217,7 +217,7 @@ umount "$MOUNTPOINT" 2>/dev/null; losetup -d $LOOPDEVICE 2>/dev/null; rmdir "$MO
 # As this is run by sudo, the output gets owned by root.
 # This isn't usually what is desired. So let's try to fix that by guessing
 # what the real user name (and group) is, and chowning the file to that.
-CALLER=`who am i | awk '{print $1}'`
+CALLER=`whoami | awk '{print $1}'`
 if [ "$CALLER" != "root" ]; then
   echo "  ***** Changing ownership to '$CALLER' *****"
   chown $CALLER.`groups $CALLER | awk '{print $1}'` "$OUTFILE" 2>/dev/null
