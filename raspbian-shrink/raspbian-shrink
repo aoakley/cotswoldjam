@@ -55,8 +55,8 @@ if [ "$1" == "-m" ]; then
   shift
   FREESPACE=$1
   shift
-  if [ $FREESPACE -lt 10 ]; then
-    echo "Must have minimum -m 10 megabytes, recommend >=256"
+  if [ $FREESPACE -lt 64 ]; then
+    echo "Must have minimum -m 64 megabytes, recommend >=256"
     exit -13
   fi
 fi
@@ -145,10 +145,7 @@ fi
 echo "  ***** Mounting filesystem to examine free space *****"
 losetup $LOOPDEVICE "$OUTFILE" -o $(($START*512))
 mkdir -p "$MOUNTPOINT" ; mount $LOOPDEVICE "$MOUNTPOINT"
-# New calculation for MINSIZE by HR090523
-# See github issue 14
-MINSIZE=`resize2fs -P $LOOPDEVICE 2>/dev/null | awk -F': ' ' { print $2 } '`
-MINSIZE=$((($MINSIZE*4096+1024*1024-1)/1024/1024)) #convert to from blocks to MB, rounded up
+MINSIZE=`df -m | sed -nr "s/^\/dev\/loop$(echo $LOOPDEVICE | sed -nr "s/\/dev\/loop//p")\s+[0-9]+\s+([0-9]+).*$/\1/p"`
 umount "$MOUNTPOINT"
 NEWSIZE=$((($MINSIZE+$FREESPACE)*2048))
 if [ "$SIZE" -le "$NEWSIZE" ]; then
@@ -182,7 +179,7 @@ if [ $? -ne 0 ]; then
   exit -10
 fi
 
-echo "  ***** Resizing filesystem to $MINSIZE + $FREESPACE = $((MINSIZE+$FREESPACE))M *****"
+echo "  ***** Resizing filesystem *****"
 resize2fs -f $LOOPDEVICE $(($MINSIZE+$FREESPACE))M
 if [ $? -ne 0 ]; then
   losetup -d $LOOPDEVICE 2>/dev/null; rmdir "$MOUNTPOINT" 2>/dev/null;
